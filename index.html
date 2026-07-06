@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grupo Magnus · Dashboard de Liquidez</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060d1a;--surface:#0d1829;--surface2:#13213a;--surface3:#192d4e;
+  --border:#1e3254;--border2:#243c61;--text:#e2eaf5;--muted:#5a7a9e;
+  --accent:#2563eb;--accent2:#3b82f6;
+  --green:#10b981;--amber:#f59e0b;--red:#ef4444;--cyan:#06b6d4;--purple:#8b5cf6;
+  --mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+.header{position:sticky;top:0;z-index:200;background:rgba(6,13,26,.96);
+  backdrop-filter:blur(16px);border-bottom:1px solid var(--border);
+  padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#1d4ed8,#6d28d9);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#fff}
+.logo-text{font-size:14px;font-weight:700}.logo-sub{font-size:10px;color:var(--muted);margin-top:1px}
+.header-right{display:flex;align-items:center;gap:10px}
+.live{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green);font-weight:500}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.pill{font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface2);
+  border:1px solid var(--border);padding:4px 10px;border-radius:6px}
+
+.upload-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:calc(100vh - 56px);padding:40px;text-align:center}
+.upload-card{background:var(--surface);border:2px dashed var(--border2);border-radius:20px;
+  padding:60px 80px;max-width:500px;width:100%;cursor:pointer;transition:all .2s}
+.upload-card:hover{border-color:var(--accent);background:var(--surface2)}
+.upload-icon{font-size:52px;margin-bottom:20px}
+.upload-title{font-size:22px;font-weight:700;margin-bottom:10px}
+.upload-sub{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:28px}
+.upload-btn{background:var(--accent);color:#fff;border:none;padding:14px 32px;
+  border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+.upload-hint{font-size:11px;color:var(--muted);margin-top:16px}
+#fileInput{display:none}
+
+.main{padding:20px 24px;max-width:1440px;margin:0 auto;display:none}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px}
+.topbar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.file-badge{display:flex;align-items:center;gap:8px;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:11px}
+.file-badge span{color:var(--muted)}
+.reload-btn{background:var(--surface2);border:1px solid var(--border2);color:var(--muted);
+  padding:6px 14px;border-radius:8px;font-size:11px;cursor:pointer;font-family:var(--sans)}
+.reload-btn:hover{border-color:var(--accent2);color:var(--text)}
+
+/* FILTER BAR */
+.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.filter-group{display:flex;align-items:center;gap:6px}
+.filter-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.8px;white-space:nowrap}
+.sep{width:1px;height:24px;background:var(--border2)}
+.fbtn{padding:5px 13px;border-radius:20px;font-size:11px;font-weight:500;
+  border:1px solid var(--border2);background:var(--surface2);color:var(--muted);
+  cursor:pointer;transition:all .15s;font-family:var(--sans)}
+.fbtn:hover{border-color:var(--accent2);color:var(--text)}
+.fbtn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.day-select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+  padding:5px 10px;border-radius:8px;font-size:11px;font-family:var(--sans);cursor:pointer;max-width:150px}
+.day-select:focus{outline:none;border-color:var(--accent)}
+.unit-btn{padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;
+  border:1.5px solid transparent;cursor:pointer;transition:all .15s;font-family:var(--sans);
+  opacity:.4}
+.unit-btn.active{opacity:1}
+.unit-btn.all-btn{border:1px solid var(--border2);background:var(--surface2);
+  color:var(--muted);font-weight:600;opacity:1}
+.unit-btn.all-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi.blue::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.kpi.green::before{background:linear-gradient(90deg,#059669,var(--green))}
+.kpi.amber::before{background:linear-gradient(90deg,#d97706,var(--amber))}
+.kpi.red::before{background:linear-gradient(90deg,#b91c1c,var(--red))}
+.kpi.cyan::before{background:linear-gradient(90deg,#0891b2,var(--cyan))}
+.kpi-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+.kpi-value{font-family:var(--mono);font-size:20px;font-weight:600;line-height:1;letter-spacing:-1px}
+.kpi-value .cur{font-size:11px;font-weight:400;color:var(--muted);margin-right:3px}
+.kpi-sub{font-size:10px;color:var(--muted);margin-top:6px}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
+  padding:2px 8px;border-radius:10px;margin-top:6px}
+.badge.up{background:rgba(16,185,129,.12);color:var(--green)}
+.badge.dn{background:rgba(239,68,68,.12);color:var(--red)}
+.badge.neu{background:rgba(245,158,11,.12);color:var(--amber)}
+.badge.info{background:rgba(6,182,212,.12);color:var(--cyan)}
+
+/* SEMAPHORE */
+.sem-strip{display:grid;gap:10px;margin-bottom:18px}
+.sem-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:13px;text-align:center;position:relative;overflow:hidden;transition:opacity .2s}
+.sem-card.hidden{display:none}
+.sem-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px}
+.sem-card.g::after{background:var(--green)}.sem-card.a::after{background:var(--amber)}.sem-card.r::after{background:var(--red)}
+.sem-name{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px}
+.sem-val{font-family:var(--mono);font-size:13px;font-weight:600}
+.sem-val.neg{color:var(--red)}
+.sem-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;
+  padding:2px 6px;border-radius:8px;margin-top:5px}
+.sem-badge.g{background:rgba(16,185,129,.15);color:var(--green)}
+.sem-badge.a{background:rgba(245,158,11,.15);color:var(--amber)}
+.sem-badge.r{background:rgba(239,68,68,.15);color:var(--red)}
+.dias-b{font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;margin-top:4px;display:inline-block}
+.dias-b.d0{display:none}.dias-b.d1{background:rgba(16,185,129,.12);color:var(--green)}
+.dias-b.d2{background:rgba(245,158,11,.15);color:var(--amber)}
+.dias-b.d3{background:rgba(239,68,68,.15);color:var(--red);animation:pr 1s infinite}
+@keyframes pr{0%,100%{opacity:1}50%{opacity:.5}}
+
+.grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-bottom:16px}
+.grid2b{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.card-tag{font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:2px 8px;border-radius:10px}
+
+.rtable{width:100%;border-collapse:collapse}
+.rtable th{font-size:9px;font-weight:600;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.6px;padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}
+.rtable td{padding:7px 8px;font-size:12px;border-bottom:1px solid rgba(30,50,84,.4)}
+.rtable tr:last-child td{border-bottom:none}.rtable tr.hidden{display:none}
+.rtable td.mono{font-family:var(--mono);font-size:11px;text-align:right}
+.rtable td.neg{color:var(--red)}.rtable td.pos{color:var(--green)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:8px}
+
+.loading{display:none;position:fixed;inset:0;background:rgba(6,13,26,.92);
+  align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:16px}
+.loading.show{display:flex}
+.spinner{width:40px;height:40px;border:3px solid var(--border2);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.footer{border-top:1px solid var(--border);padding:12px 24px;
+  display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.footer-note{font-size:10px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:var(--muted)">Lendo arquivo Excel...</div>
+</div>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-mark">GM</div>
+    <div><div class="logo-text">Grupo Magnus</div><div class="logo-sub">Dashboard de Liquidez · Automático</div></div>
+  </div>
+  <div class="header-right">
+    <div class="live" id="liveStatus" style="display:none"><div class="live-dot"></div>Dados carregados</div>
+    <div class="pill" id="dtNow"></div>
+  </div>
+</header>
+
+<div class="upload-zone" id="uploadZone">
+  <div class="upload-card" onclick="document.getElementById('fileInput').click()">
+    <div class="upload-icon">📊</div>
+    <div class="upload-title">Carregar Planilha Magnus</div>
+    <div class="upload-sub">
+      Selecione o arquivo <strong>Magnus_Saldos_Jul_Dez_2026_v11.xlsx</strong><br>
+      O dashboard é gerado automaticamente com todos os dados preenchidos.<br>
+      <em style="font-size:12px">100% offline — seus dados nunca saem do computador.</em>
+    </div>
+    <button class="upload-btn">📂 Selecionar Arquivo Excel</button>
+    <div class="upload-hint">Chrome, Edge ou Firefox</div>
+  </div>
+  <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadFile(this)">
+</div>
+
+<div class="main" id="dashboard">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="file-badge">📄 <span>Arquivo:</span> <strong id="fileName">—</strong></div>
+      <button class="reload-btn" onclick="document.getElementById('fileInput').click()">⟳ Trocar arquivo</button>
+      <div style="font-size:11px;color:var(--muted)" id="dataCount"></div>
+    </div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Período</span>
+      <button class="fbtn" onclick="setPeriod(7,this)">7 dias</button>
+      <button class="fbtn" onclick="setPeriod(15,this)">15 dias</button>
+      <button class="fbtn active" onclick="setPeriod(30,this)">30 dias</button>
+      <button class="fbtn" onclick="setPeriod(0,this)">Todos</button>
+    </div>
+    <div class="sep"></div>
+    <div class="filter-group">
+      <span class="filter-label">Dia</span>
+      <select class="day-select" id="daySelect" onchange="setDay(this.value)">
+        <option value="">— mais recente —</option>
+      </select>
+    </div>
+    <div class="sep"></div>
+    <div class="filter-group">
+      <span class="filter-label">Unidade</span>
+      <div id="unitFilters" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpiRow"></div>
+  <div class="sem-strip" id="semStrip"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-title">📈 Posição Líquida Consolidada</span>
+        <span class="card-tag" id="periodTag">últimos 30 dias</span>
+      </div>
+      <canvas id="chartLine" height="190"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-title">🏥 Composição do Caixa</span>
+        <span class="card-tag" id="todayTag">dia selecionado</span>
+      </div>
+      <canvas id="chartDoughnut" height="190"></canvas>
+    </div>
+  </div>
+
+  <div class="grid2b">
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-title">📊 Saldo por Unidade</span>
+        <span class="card-tag">dia selecionado</span>
+      </div>
+      <canvas id="chartBar" height="180"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-title">💸 A Pagar vs Saldo Pós-Pag.</span>
+        <span class="card-tag" id="periodTag2">período</span>
+      </div>
+      <canvas id="chartArea" height="180"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr">
+      <span class="card-title">🏆 Ranking de Liquidez</span>
+      <span class="card-tag">dia selecionado</span>
+    </div>
+    <table class="rtable" id="rankTable"></table>
+  </div>
+</div>
+
+<footer class="footer" id="footerBar" style="display:none">
+  <div class="footer-note">Grupo Magnus · Controladoria · <strong style="color:var(--accent2)">Leitura direta do Excel</strong></div>
+  <div class="footer-note" id="lastUpdate"></div>
+</footer>
+
+<script>
+const UNITS = ["ALFENAS","CAMPINAS","VARGINHA","ITAJUBÁ","SANTÉ","CONSÓRCIO MAGNUS"];
+const COLORS = {
+  "ALFENAS":"#3b82f6","CAMPINAS":"#f59e0b","VARGINHA":"#10b981",
+  "ITAJUBÁ":"#ef4444","SANTÉ":"#8b5cf6","CONSÓRCIO MAGNUS":"#06b6d4"
+};
+const UROWS = {
+  "ALFENAS":         {sr:12, rl:15},
+  "CAMPINAS":        {sr:23, rl:26},
+  "VARGINHA":        {sr:35, rl:38},
+  "ITAJUBÁ":         {sr:45, rl:48},
+  "SANTÉ":           {sr:56, rl:59},
+  "CONSÓRCIO MAGNUS":{sr:64, rl:67},
+};
+const CR = {saldo:71, a_pagar:74, pos_pag:75, get_net:76, pos_liq:77};
+
+let allData = [];
+let period = 30;
+let selectedDay = null;
+let activeUnits = new Set(UNITS);
+let charts = {};
+
+const now = new Date();
+document.getElementById('dtNow').textContent =
+  `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+// Build unit filter buttons
+const ufc = document.getElementById('unitFilters');
+// "Todas" button
+const allBtn = document.createElement('button');
+allBtn.className = 'unit-btn all-btn active';
+allBtn.textContent = 'Todas';
+allBtn.onclick = () => {
+  activeUnits = new Set(UNITS);
+  document.querySelectorAll('.unit-btn:not(.all-btn)').forEach(b => b.classList.add('active'));
+  allBtn.classList.add('active');
+  render();
+};
+ufc.appendChild(allBtn);
+
+UNITS.forEach(u => {
+  const btn = document.createElement('button');
+  btn.className = 'unit-btn active';
+  btn.textContent = u.replace('CONSÓRCIO MAGNUS','CONSÓRCIO');
+  btn.style.borderColor = COLORS[u];
+  btn.style.color = COLORS[u];
+  btn.style.background = COLORS[u] + '18';
+  btn.dataset.unit = u;
+  btn.onclick = () => {
+    if (activeUnits.has(u)) {
+      activeUnits.delete(u);
+      btn.classList.remove('active');
+      btn.style.opacity = '.35';
+    } else {
+      activeUnits.add(u);
+      btn.classList.add('active');
+      btn.style.opacity = '1';
+    }
+    // update "Todas" btn state
+    allBtn.classList.toggle('active', activeUnits.size === UNITS.length);
+    render();
+  };
+  ufc.appendChild(btn);
+});
+
+function loadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('fileName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      allData = [];
+      wb.SheetNames.forEach(sname => {
+        if (sname === 'ÍNDICE') return;
+        const m = sname.match(/^(\d{2})_(\d{2})$/);
+        if (!m) return;
+        const ws = wb.Sheets[sname];
+        const v = (r,c) => {
+          const cell = ws[XLSX.utils.encode_cell({r:r-1,c:c-1})];
+          return (cell && typeof cell.v === 'number') ? cell.v : 0;
+        };
+        const day = {label:`${m[1]}/${m[2]}`,date:`${m[1]}/${m[2]}/2026`,sname,units:{},cons:{}};
+        UNITS.forEach(u => {
+          const rr = UROWS[u];
+          day.units[u] = {
+            saldo:    v(rr.sr, 2),
+            che_usd:  v(rr.sr, 4),
+            cg_usd:   v(rr.sr, 6),
+            a_pagar:  v(rr.sr, 8),
+            pos_pag:  v(rr.sr, 9),
+            dias_chq: v(rr.sr,10),
+            saldo_k:  v(rr.sr,11),
+            pos_liq:  v(rr.rl,11),
+          };
+        });
+        day.cons = {
+          saldo:   v(CR.saldo,  11),
+          a_pagar: v(CR.a_pagar,11),
+          pos_pag: v(CR.pos_pag,11),
+          get_net: v(CR.get_net,11),
+          pos_liq: v(CR.pos_liq,11),
+        };
+        if (day.cons.saldo!==0||day.cons.get_net!==0||day.cons.pos_pag!==0) allData.push(day);
+      });
+      allData.sort((a,b)=>{
+        const [da,ma]=a.label.split('/').map(Number);
+        const [db,mb]=b.label.split('/').map(Number);
+        return (ma*100+da)-(mb*100+db);
+      });
+      const sel = document.getElementById('daySelect');
+      sel.innerHTML = '<option value="">— mais recente —</option>';
+      [...allData].reverse().forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.label; opt.textContent = d.date; sel.appendChild(opt);
+      });
+      document.getElementById('dataCount').textContent = `${allData.length} dias com dados`;
+      document.getElementById('loading').classList.remove('show');
+      document.getElementById('uploadZone').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      document.getElementById('footerBar').style.display = 'flex';
+      document.getElementById('liveStatus').style.display = 'flex';
+      document.getElementById('lastUpdate').textContent =
+        `${allData.length} dias · carregado às ${now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+      selectedDay = null; render();
+    } catch(err) {
+      document.getElementById('loading').classList.remove('show');
+      alert('Erro ao ler arquivo: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setPeriod(n, btn) {
+  period = n;
+  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const lbl = {7:'últimos 7 dias',15:'últimos 15 dias',30:'últimos 30 dias',0:'todo o período'};
+  document.getElementById('periodTag').textContent = lbl[n];
+  document.getElementById('periodTag2').textContent = lbl[n];
+  render();
+}
+function setDay(val) { selectedDay = val || null; render(); }
+
+const fmt = v => {
+  const a=Math.abs(v);
+  const s=a>=1e6?(a/1e6).toFixed(1)+'M':a>=1e3?(a/1e3).toFixed(0)+'k':a.toFixed(0);
+  return (v<0?'-':'')+'R$ '+s;
+};
+const fmtFull = v =>
+  (v<0?'-':'')+'R$ '+Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const sc = v => v>0?'g':v>=-50000?'a':'r';
+const sl = v => v>0?'SAUDÁVEL':v>=-50000?'ATENÇÃO':'CRÍTICO';
+const dc = d => d===0?'d0':d<=3?'d1':d===4?'d2':'d3';
+const destroy = id => { if(charts[id]){charts[id].destroy();delete charts[id];} };
+
+const cDef = {
+  responsive:true,
+  plugins:{
+    legend:{labels:{color:'#5a7a9e',font:{size:10}}},
+    tooltip:{backgroundColor:'#0d1829',borderColor:'#1e3254',borderWidth:1,
+      titleColor:'#5a7a9e',bodyColor:'#e2eaf5',
+      callbacks:{label:ctx=>`  ${ctx.dataset.label||ctx.label}: ${fmtFull(ctx.raw)}`}}
+  },
+  scales:{
+    x:{grid:{color:'rgba(30,50,84,.3)'},ticks:{color:'#5a7a9e',font:{size:9},maxTicksLimit:10}},
+    y:{grid:{color:'rgba(30,50,84,.3)'},ticks:{color:'#5a7a9e',font:{size:9,family:"'JetBrains Mono'"},callback:v=>fmt(v)}}
+  }
+};
+
+function render() {
+  if (!allData.length) return;
+  const AU = UNITS.filter(u => activeUnits.has(u));
+  const today = selectedDay ? allData.find(d=>d.label===selectedDay)||allData[allData.length-1] : allData[allData.length-1];
+  const slice = period===0 ? allData : allData.slice(-Math.min(period,allData.length));
+  const yesterday = allData[allData.indexOf(today)-1] || today;
+
+  document.getElementById('todayTag').textContent = today.date;
+
+  // update sem strip columns based on active units count
+  document.getElementById('semStrip').style.gridTemplateColumns = `repeat(${AU.length},1fr)`;
+
+  // ── KPIs ──
+  const totK   = AU.reduce((s,u)=>s+(today.units[u].saldo_k||0),0);
+  const totPos = AU.reduce((s,u)=>s+(today.units[u].pos_liq||0),0);
+  const totPag = AU.reduce((s,u)=>s+(today.units[u].a_pagar||0),0);
+  const yestK  = AU.reduce((s,u)=>s+(yesterday.units[u].saldo_k||0),0);
+  const varDay = totK - yestK;
+  const varPct = yestK ? ((varDay/Math.abs(yestK))*100).toFixed(1) : 0;
+  const maxDias = Math.max(...AU.map(u=>today.units[u].dias_chq||0));
+
+  document.getElementById('kpiRow').innerHTML = [
+    {lbl:'💰 Caixa + Get Net', val:totK, cls:'blue',
+     sub:`Dia ${today.date} · ${AU.length} unidade${AU.length>1?'s':''}`,
+     badge:{txt:`${varDay>=0?'▲':'▼'} ${Math.abs(varPct)}% vs dia ant.`, cls:varDay>=0?'up':'dn'}},
+    {lbl:'✅ Posição Líquida', val:totPos, cls:'green',
+     sub:'Saldo + Get Net + Limites + Mútuos',
+     badge:{txt:totPos>0?'Positivo':'Negativo', cls:totPos>0?'up':'dn'}},
+    {lbl:'💸 A Pagar Hoje', val:totPag, cls:'amber',
+     sub:'Total compromissos do período',
+     badge:{txt:'Consolidado', cls:'neu'}},
+    {lbl:'📅 Ch. Especial', val:maxDias, cls:maxDias>=5?'red':maxDias===4?'amber':'cyan',
+     cnt:true, sub:'Dias consecutivos · Santander',
+     badge:{txt:maxDias>=5?'⚠ LIMITE ATINGIDO!':maxDias===4?'⚠ 4 dias':'Normal', cls:maxDias>=5?'dn':maxDias===4?'neu':'info'}},
+  ].map(k=>`
+    <div class="kpi ${k.cls}">
+      <div class="kpi-label">${k.lbl}</div>
+      <div class="kpi-value">
+        ${k.cnt
+          ? `<span style="font-size:34px;color:${maxDias>=5?'var(--red)':maxDias===4?'var(--amber)':'var(--green)'}">${k.val}</span><span style="font-size:13px;color:var(--muted)"> dias</span>`
+          : `<span class="cur">R$</span>${Math.abs(k.val).toLocaleString('pt-BR',{maximumFractionDigits:0})}`}
+      </div>
+      <div class="kpi-sub">${k.sub}</div>
+      <div class="badge ${k.badge.cls}">${k.badge.txt}</div>
+    </div>`).join('');
+
+  // ── SEMAPHORE ──
+  document.getElementById('semStrip').innerHTML = UNITS.map(u => {
+    const d=today.units[u]; const s=sc(d.pos_liq); const dias=d.dias_chq||0;
+    const hidden = !activeUnits.has(u) ? 'hidden' : '';
+    return `<div class="sem-card ${s} ${hidden}">
+      <div class="sem-name">${u.replace('CONSÓRCIO MAGNUS','CONSÓRCIO')}</div>
+      <div class="sem-val ${d.pos_liq<0?'neg':''}">${fmt(d.pos_liq)}</div>
+      <div><span class="sem-badge ${s}">${sl(d.pos_liq)}</span></div>
+      <div><span class="dias-b ${dc(dias)}">${dias>0?dias+' dia'+(dias>1?'s':'')+' ch.esp':''}</span></div>
+    </div>`;
+  }).join('');
+
+  // ── LINE: Posição Líquida ──
+  destroy('line');
+  const c1=document.getElementById('chartLine').getContext('2d');
+  const g1=c1.createLinearGradient(0,0,0,190);
+  g1.addColorStop(0,'rgba(59,130,246,.25)');g1.addColorStop(1,'rgba(59,130,246,0)');
+  charts.line=new Chart(c1,{type:'line',
+    data:{labels:slice.map(d=>d.label),datasets:[{
+      label:'Posição Líquida',
+      data:slice.map(d=>AU.reduce((s,u)=>s+(d.units[u].pos_liq||0),0)),
+      borderColor:'#3b82f6',backgroundColor:g1,borderWidth:2,
+      pointRadius:2,pointHoverRadius:5,tension:.35,fill:true}]},
+    options:{...cDef,plugins:{...cDef.plugins,legend:{display:false}}}
+  });
+
+  // ── DOUGHNUT ──
+  destroy('doughnut');
+  const posU=AU.filter(u=>today.units[u].saldo_k>0);
+  const c2=document.getElementById('chartDoughnut').getContext('2d');
+  charts.doughnut=new Chart(c2,{type:'doughnut',
+    data:{
+      labels:posU.map(u=>u.replace('CONSÓRCIO MAGNUS','CONSÓRCIO')),
+      datasets:[{data:posU.map(u=>today.units[u].saldo_k),
+        backgroundColor:posU.map(u=>COLORS[u]+'cc'),
+        borderColor:posU.map(u=>COLORS[u]),borderWidth:2,hoverOffset:6}]
+    },
+    options:{responsive:true,cutout:'62%',
+      plugins:{legend:{position:'right',labels:{color:'#5a7a9e',font:{size:10},padding:10,boxWidth:10}},
+        tooltip:{backgroundColor:'#0d1829',borderColor:'#1e3254',borderWidth:1,
+          titleColor:'#5a7a9e',bodyColor:'#e2eaf5',
+          callbacks:{label:ctx=>`  ${ctx.label}: ${fmtFull(ctx.raw)}`}}}
+    }
+  });
+
+  // ── BAR ──
+  destroy('bar');
+  const c3=document.getElementById('chartBar').getContext('2d');
+  charts.bar=new Chart(c3,{type:'bar',
+    data:{
+      labels:AU.map(u=>u.replace('CONSÓRCIO MAGNUS','CONSÓRCIO')),
+      datasets:[
+        {label:'Saldo + Get Net',data:AU.map(u=>today.units[u].saldo_k),
+         backgroundColor:AU.map(u=>COLORS[u]+'99'),borderColor:AU.map(u=>COLORS[u]),borderWidth:1.5,borderRadius:4},
+        {label:'Posição Líquida',data:AU.map(u=>today.units[u].pos_liq),
+         backgroundColor:AU.map(u=>COLORS[u]+'33'),borderColor:AU.map(u=>COLORS[u]),borderWidth:1.5,borderRadius:4},
+      ]},
+    options:{...cDef,scales:{...cDef.scales,x:{...cDef.scales.x,ticks:{color:'#5a7a9e',font:{size:9}}}}}
+  });
+
+  // ── AREA ──
+  destroy('area');
+  const c4=document.getElementById('chartArea').getContext('2d');
+  const gA=c4.createLinearGradient(0,0,0,180);
+  gA.addColorStop(0,'rgba(16,185,129,.2)');gA.addColorStop(1,'rgba(16,185,129,0)');
+  const gB=c4.createLinearGradient(0,0,0,180);
+  gB.addColorStop(0,'rgba(239,68,68,.2)');gB.addColorStop(1,'rgba(239,68,68,0)');
+  charts.area=new Chart(c4,{type:'line',
+    data:{labels:slice.map(d=>d.label),datasets:[
+      {label:'Saldo Pós-Pag.',data:slice.map(d=>AU.reduce((s,u)=>s+(d.units[u].pos_pag||0),0)),
+       borderColor:'#10b981',backgroundColor:gA,borderWidth:2,pointRadius:0,tension:.35,fill:true},
+      {label:'A Pagar',data:slice.map(d=>AU.reduce((s,u)=>s+(d.units[u].a_pagar||0),0)),
+       borderColor:'#ef4444',backgroundColor:gB,borderWidth:2,pointRadius:0,tension:.35,fill:true},
+    ]},options:{...cDef}
+  });
+
+  // ── RANKING ──
+  const ranked=[...AU].map(u=>({u,d:today.units[u]})).sort((a,b)=>b.d.pos_liq-a.d.pos_liq);
+  const maxV=Math.max(...ranked.map(r=>Math.abs(r.d.pos_liq)),1);
+  document.getElementById('rankTable').innerHTML=
+    `<thead><tr>
+      <th>#</th><th>Unidade</th>
+      <th style="text-align:right">Saldo+Get Net</th>
+      <th style="text-align:right">A Pagar</th>
+      <th style="text-align:right">Posição Líquida</th>
+      <th>Barra</th><th style="text-align:center">Status</th>
+      <th style="text-align:center">Ch.Esp</th>
+    </tr></thead>
+    <tbody>${ranked.map((r,i)=>{
+      const s=sc(r.d.pos_liq);
+      const bC=s==='g'?'var(--green)':s==='a'?'var(--amber)':'var(--red)';
+      const dias=r.d.dias_chq||0;
+      return `<tr>
+        <td style="color:var(--muted);font-size:11px;font-weight:700">${i+1}</td>
+        <td><span class="dot" style="background:${COLORS[r.u]}"></span>${r.u}</td>
+        <td class="mono ${r.d.saldo_k<0?'neg':''}">${fmtFull(r.d.saldo_k)}</td>
+        <td class="mono" style="color:var(--amber)">${fmtFull(r.d.a_pagar)}</td>
+        <td class="mono ${r.d.pos_liq<0?'neg':'pos'}" style="font-weight:700">${fmtFull(r.d.pos_liq)}</td>
+        <td style="width:80px"><div style="height:4px;background:var(--surface3);border-radius:2px">
+          <div style="height:4px;width:${Math.round(Math.abs(r.d.pos_liq)/maxV*100)}%;background:${bC};border-radius:2px"></div></div></td>
+        <td style="text-align:center"><span class="sem-badge ${s}">${sl(r.d.pos_liq)}</span></td>
+        <td style="text-align:center"><span class="dias-b ${dc(dias)}">${dias>0?dias+'d':''}</span>${dias===0?'<span style="color:var(--muted);font-size:10px">—</span>':''}</td>
+      </tr>`;
+    }).join('')}</tbody>`;
+}
+
+// Auto-load via servidor local
+(async function autoLoad() {
+  if (window.location.protocol === 'file:') return;
+  const candidates = [
+    'Magnus_Saldos_Jul_Dez_2026_v11.xlsx',
+    'Magnus_Saldos_Jul_Dez_2026_v10.xlsx',
+    'Magnus_Saldos_Jul_Dez_2026_FINAL2.xlsx',
+  ];
+  for (const fname of candidates) {
+    try {
+      const res = await fetch(fname, {cache:'no-store'});
+      if (!res.ok) continue;
+      const blob = await res.blob();
+      const file = new File([blob], fname);
+      document.getElementById('fileName').textContent = fname;
+      document.getElementById('loading').classList.add('show');
+      const reader = new FileReader();
+      reader.onload = e => {
+        // reuse same parse logic
+        const input = {files:[new File([e.target.result], fname)]};
+        document.getElementById('loading').classList.remove('show');
+        const evt = {target:{result:e.target.result}};
+        try {
+          const wb = XLSX.read(e.target.result, {type:'array'});
+          allData = [];
+          wb.SheetNames.forEach(sname => {
+            if (sname==='ÍNDICE') return;
+            const m = sname.match(/^(\d{2})_(\d{2})$/);
+            if (!m) return;
+            const ws = wb.Sheets[sname];
+            const v = (r,c) => { const cell=ws[XLSX.utils.encode_cell({r:r-1,c:c-1})]; return (cell&&typeof cell.v==='number')?cell.v:0; };
+            const day = {label:`${m[1]}/${m[2]}`,date:`${m[1]}/${m[2]}/2026`,sname,units:{},cons:{}};
+            UNITS.forEach(u => {
+              const rr=UROWS[u];
+              day.units[u]={saldo:v(rr.sr,2),che_usd:v(rr.sr,4),cg_usd:v(rr.sr,6),a_pagar:v(rr.sr,8),pos_pag:v(rr.sr,9),dias_chq:v(rr.sr,10),saldo_k:v(rr.sr,11),pos_liq:v(rr.rl,11)};
+            });
+            day.cons={saldo:v(CR.saldo,11),a_pagar:v(CR.a_pagar,11),pos_pag:v(CR.pos_pag,11),get_net:v(CR.get_net,11),pos_liq:v(CR.pos_liq,11)};
+            if (day.cons.saldo!==0||day.cons.get_net!==0||day.cons.pos_pag!==0) allData.push(day);
+          });
+          allData.sort((a,b)=>{const [da,ma]=a.label.split('/').map(Number);const [db,mb]=b.label.split('/').map(Number);return(ma*100+da)-(mb*100+db);});
+          const sel=document.getElementById('daySelect');
+          sel.innerHTML='<option value="">— mais recente —</option>';
+          [...allData].reverse().forEach(d=>{const opt=document.createElement('option');opt.value=d.label;opt.textContent=d.date;sel.appendChild(opt);});
+          document.getElementById('dataCount').textContent=`${allData.length} dias com dados`;
+          document.getElementById('uploadZone').style.display='none';
+          document.getElementById('dashboard').style.display='block';
+          document.getElementById('footerBar').style.display='flex';
+          document.getElementById('liveStatus').style.display='flex';
+          document.getElementById('lastUpdate').textContent=`${allData.length} dias · carregado automaticamente`;
+          selectedDay=null; render();
+        } catch(err){ console.warn(err); }
+      };
+      reader.readAsArrayBuffer(await blob.arrayBuffer());
+      break;
+    } catch(e){ continue; }
+  }
+})();
+</script>
+</body>
+</html>
